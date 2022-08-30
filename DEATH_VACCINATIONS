@@ -1,0 +1,98 @@
+select location, date, total_cases, new_cases, total_deaths,new_deaths, population
+from coronavirus_project..death
+where location='India'
+order by 1,2
+
+-- death to case ratio:
+
+select location, date,total_cases, total_deaths, cast(total_deaths as integer)/total_cases*100 as death_percent
+from coronavirus_project..death
+where total_deaths is not null
+and location LIKE '%states%'
+order by date
+
+-- Infection Ratio
+select location, date,total_cases,population,total_cases/population*100 as infection_ratio
+from coronavirus_project..death
+where total_deaths is not null
+and location like '%states%'
+order by date
+
+--highest infection rate countries of the world
+
+select location,population, max(total_cases)*100/population as infected_population
+from coronavirus_project..death
+where continent is not null
+and total_cases is not null
+group by location, population
+order by 3 desc
+
+--highest death rate countries of the world
+
+select location,population, max(cast(total_deaths as int)) as deaths ,max(cast(total_deaths as int)*100/population) as death_ratio
+from coronavirus_project..death
+where continent is not null
+group by location, population
+order by 3 desc
+
+-- continent wise
+
+select location, max(cast(total_deaths as int)) as total_death
+from coronavirus_project..death
+where continent is null
+group by location
+order by 2 desc
+ 
+--globAL SCENARIO
+
+SELECT date, sum(total_cases) as total_cases, sum(new_cases) as newcase,
+sum(cast(total_deaths as int)) as deaths, sum(cast(new_deaths as int)) as new_death,
+sum(cast(total_deaths as int))/sum(total_cases)*100 as death_percent
+from coronavirus_project..death
+where continent is not null 
+group by date
+having sum(total_cases) is not null
+order by 1
+
+--total population vs vaccinations
+
+select dea.continent, dea.location, dea.date, dea.population, vac.total_vaccinations, vac.new_vaccinations
+from coronavirus_project..death dea inner join coronavirus_project..vaccinations vac
+on dea.date=vac.date
+and dea.location=vac.location
+where dea.continent is not null
+and dea.location='india'
+order by 3
+
+-- 2nd way
+
+select dea.location, dea.date, dea.population, vac.new_vaccinations, 
+sum(convert(int,vac.new_vaccinations)) over (partition by dea.location
+order by dea.location, dea.date) as rolling_total_vaccine
+from coronavirus_project..death dea 
+inner join
+coronavirus_project..vaccinations vac
+on dea.location= vac.location
+and dea.date=vac.date
+where dea.continent is not null
+and vac.new_vaccinations is not null
+order by 1,2
+
+-- using cte
+
+with popvsvac(location, date, population, new_vaccinations, rolling_total_vaccine)
+as 
+(select dea.location, dea.date, dea.population, vac.new_vaccinations, 
+sum(convert(int,vac.new_vaccinations)) over (partition by dea.location
+order by dea.location, dea.date) as rolling_total_vaccine
+from coronavirus_project..death dea 
+inner join
+coronavirus_project..vaccinations vac
+on dea.location= vac.location
+and dea.date=vac.date
+where dea.continent is not null
+and vac.new_vaccinations is not null
+)
+select *,rolling_total_vaccine/population*100 as percentvac from popvsvac
+order by 1,2
+
